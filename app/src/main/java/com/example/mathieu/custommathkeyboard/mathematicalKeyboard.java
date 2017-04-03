@@ -3,7 +3,6 @@ package com.example.mathieu.custommathkeyboard;
 import android.content.Context;
 import android.graphics.LightingColorFilter;
 import android.os.Handler;
-import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.view.KeyEvent;
@@ -113,7 +112,7 @@ public class mathematicalKeyboard extends GridLayout{
         backspaceBtn.setLayoutParams(btnParams);
         backspaceBtn.setImageResource(R.drawable.backspace);
         //backspaceBtn.setOnClickListener(backspaceListener);
-        backspaceBtn.setOnTouchListener(backspaceToutchListener);
+        backspaceBtn.setOnTouchListener(backspaceTouchListener);
         addView(backspaceBtn);
 
         //button 27 to 30 are button to change between symbol and letters
@@ -147,7 +146,7 @@ public class mathematicalKeyboard extends GridLayout{
 
 
 
-        backspaceHandler = new Handler(); //initialization of the Handler 
+        backspaceHandler = new Handler(); //initialization of the Handler
     }
 
     /**
@@ -232,16 +231,16 @@ public class mathematicalKeyboard extends GridLayout{
     /**
      * Listener called when the backspace is toutched
      */
-   final OnTouchListener backspaceToutchListener = new OnTouchListener() {
+   final OnTouchListener backspaceTouchListener = new OnTouchListener() {
        @Override
        public boolean onTouch(View v, MotionEvent event) {
-           boolean holding = true;
-           while (holding){
-               typingZone.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
-               SystemClock.sleep(500);
+
+           if(event.getAction() == MotionEvent.ACTION_DOWN)
+                backspaceHandler.postDelayed(run, 0);
+
                if(event.getAction() == MotionEvent.ACTION_UP)
-                   holding = false;
-           }
+                   backspaceHandler.removeCallbacks(run);
+
            return true;
        }
    };
@@ -318,5 +317,16 @@ public class mathematicalKeyboard extends GridLayout{
         for (int i = 0; i < 28; i++)
            key[i].setText(keyText[i +46]);
     }
+
+    /**
+     * The runnable that calls delete while the key is held
+     */
+    private Runnable run = new Runnable() {
+        @Override
+        public void run() {
+            typingZone.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
+            backspaceHandler.postDelayed(run, 250);
+        }
+    };
 
 }
