@@ -3,6 +3,10 @@ package com.example.mathieu.custommathkeyboard;
 import android.content.Context;
 import android.graphics.LightingColorFilter;
 import android.os.Handler;
+import android.text.Spannable;
+import android.text.SpannableStringBuilder;
+import android.text.style.RelativeSizeSpan;
+import android.text.style.SuperscriptSpan;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.view.KeyEvent;
@@ -14,7 +18,6 @@ import android.widget.EditText;
 import android.widget.GridLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
-
 /**
  * Created by Mathieu on 2017-03-13.
  */
@@ -23,44 +26,56 @@ public class mathematicalKeyboard extends GridLayout{
 
     private Button[] key;
     private Button confirmBtn;
-    private Button limBtn;
+
+    EquationManager eqManager;
+
     private ImageButton backspaceBtn;
     private EditText typingZone;
     private int screenWidth;
     private Handler backspaceHandler;
 
+    private boolean exponentMode; //if true everything will be written in exponent
+
     private String[] keyText = {
 
-            "1", "2", // 0 to 9 for number
+
+            "a", "b", //0 to 25 for letters
+            "c", "d",
+            "e", "f",
+            "g", "h",
+            "i", "j",
+            "k", "l",
+            "m", "n",
+            "o", "p",
+            "q", "r",
+            "s", "t",
+            "u", "v",
+            "w", "x",
+            "y", "z",
+
+            ",", ".",
+
+            "1", "2", // 28 to 37 for number
             "3", "4",
             "5", "6",
             "7", "8",
             "9", "0",
 
-            "a", "b", //10 to 27 for letters
-            "e", "f",
-            "g", "h",
-            "i", "j",
-            "n", "o",
-            "p", "r",
-            "s", "t",
-            "w", "x",
-            "y", "z",
-
-            "+", "-", //28 to 45 for symbols
+            "+", "-", //38 to 55 for symbols
             "•", "/",
-            "=", "÷",
-            "≤", "≥",
-            "<", ">",
-            "±", ",",
+            "÷", "=",
+            "≠", "≤",
+            "≥", "<",
+            ">", "±",
             "(", ")",
             "[", "]",
-            "!", "√",
+            "!", "xy",
 
-            "≈", "≠", //46 to 64 for greek letters and other
+
+            //56 to 74 for greek letters and other
             "—", "∞",
             "|", "′",
-            "ഽ",
+            "ഽ", "√",
             "α", "π",
             "β", "Δ",
             "μ", "φ",
@@ -68,14 +83,16 @@ public class mathematicalKeyboard extends GridLayout{
             "λ", "ω",
             "δ", "σ",
 
-            "", "", //empty string
-            "", "",
-            "", "",
-            "", "",
-            "",
 
-
-            //"⟶", "⇀",
+            "sin", "cos", //75 to 83 for the functions
+            "tan", "sin",
+            "cos", "tan",
+            "lim", "ln",
+            "log", "",
+            "", "",
+            "", "",
+            "", "",
+            "", "",
 };
 
 
@@ -94,7 +111,7 @@ public class mathematicalKeyboard extends GridLayout{
         LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT);
 
         //creating button and adding them to the layout
-        key = new Button[31];
+        key = new Button[41];
         for(int i = 0; i < 28; i++){
             key[i] = new Button(context);
             key[i].getBackground().setColorFilter(new LightingColorFilter(0xFFFFFFFF, 0xFFAA0000));
@@ -111,12 +128,11 @@ public class mathematicalKeyboard extends GridLayout{
         backspaceBtn.getBackground().setColorFilter(new LightingColorFilter(0xFFFFFFFF, 0xFFAA0000));
         backspaceBtn.setLayoutParams(btnParams);
         backspaceBtn.setImageResource(R.drawable.backspace);
-        //backspaceBtn.setOnClickListener(backspaceListener);
         backspaceBtn.setOnTouchListener(backspaceTouchListener);
         addView(backspaceBtn);
 
         //button 27 to 30 are button to change between symbol and letters
-        for(int i = 28; i < 31; i++){
+        for(int i = 28; i < 32; i++){
             key[i] = new Button(context);
             key[i].getBackground().setColorFilter(new LightingColorFilter(0xFFFFFFFF, 0xFFAA0000));
             key[i].setLayoutParams(btnParams);
@@ -126,27 +142,37 @@ public class mathematicalKeyboard extends GridLayout{
         }
 
         key[28].setText("abc");
+        key[28].getBackground().setColorFilter(new LightingColorFilter(0xAAAABB00, 0xFFAA0000)); //setting the button to be highlighted
         key[29].setText("#+=");
         key[30].setText("βΔഽ");
+        key[31].setText("fnc");
+
+
+        //button 32 to 41 are functions buttons
+        for(int i = 32; i < 41; i++){
+            key[i] = new Button(context);
+            key[i].getBackground().setColorFilter(new LightingColorFilter(0xFFFFFFFF, 0xFFAA0000));
+            key[i].setLayoutParams(btnParams);
+            key[i].setOnClickListener(keyClickListener);
+            key[i].setTransformationMethod(null);
+        }
 
 
         //Adding confirm Button
         confirmBtn = new Button(context);
         confirmBtn.getBackground().setColorFilter(new LightingColorFilter(0xFFFFFFFF, 0xFFAA0000));
         confirmBtn.setLayoutParams(btnParams);
-        confirmBtn.setText(R.string.confirm);
+        confirmBtn.setText("OK");
+        confirmBtn.setOnClickListener(confirmClickListener);
         addView(confirmBtn);
 
-        //creating lim button
-        limBtn = new Button(context);
-        limBtn.getBackground().setColorFilter(new LightingColorFilter(0xFFFFFFFF, 0xFFAA0000));
-        limBtn.setLayoutParams(btnParams);
-        limBtn.setTransformationMethod(null);
-        limBtn.setOnClickListener(keyClickListener);
 
+        exponentMode = false;
 
 
         backspaceHandler = new Handler(); //initialization of the Handler
+
+
     }
 
     /**
@@ -159,6 +185,9 @@ public class mathematicalKeyboard extends GridLayout{
         setKeyWidith();
         setVisibility(VISIBLE);
         typingZone = writingZone;
+
+        //creation of the EquationManager
+        eqManager = new EquationManager(typingZone.getText().toString());
     }
 
 
@@ -166,23 +195,23 @@ public class mathematicalKeyboard extends GridLayout{
      * Setting the button layout param and the width
      */
     private void setKeyWidith(){
-        int keyWidith = screenWidth / 10;
+        int keyWidth = screenWidth / 10;
 
 
         for(int i = 0; i < 28; i++){
             ViewGroup.LayoutParams params = key[i].getLayoutParams();
-            params.width = keyWidith;
+            params.width = keyWidth;
             key[i].setLayoutParams(params);
         }
 
-        for(int i = 28; i < 31; i++){
+        for(int i = 28; i < 32; i++){
             //setting rowSpan
             GridLayout.LayoutParams LP = (GridLayout.LayoutParams)key[i].getLayoutParams();
             LP.columnSpec = GridLayout.spec((i - 28)*2, 2);
             key[i].setLayoutParams(LP);
 
             ViewGroup.LayoutParams params = key[i].getLayoutParams();
-            params.width = keyWidith * 2;
+            params.width = keyWidth * 2;
             key[i].setLayoutParams(params);
         }
 
@@ -192,16 +221,16 @@ public class mathematicalKeyboard extends GridLayout{
         backspaceBtn.setLayoutParams(backspaceLP);
 
         ViewGroup.LayoutParams params = backspaceBtn.getLayoutParams();
-        params.width = keyWidith * 2;
+        params.width = keyWidth * 2;
         backspaceBtn.setLayoutParams(params);
 
-        //comfirm button
+        //confirm button
         GridLayout.LayoutParams confirmLP = (GridLayout.LayoutParams)confirmBtn.getLayoutParams();
-        confirmLP.columnSpec = GridLayout.spec(6, 4);
+        confirmLP.columnSpec = GridLayout.spec(8, 2);
         confirmBtn.setLayoutParams(confirmLP);
 
         params = confirmBtn.getLayoutParams();
-        params.width = keyWidith * 4;
+        params.width = keyWidth * 2;
         confirmBtn.setLayoutParams(params);
     }
 
@@ -210,69 +239,150 @@ public class mathematicalKeyboard extends GridLayout{
      */
     final OnClickListener keyClickListener = new OnClickListener() {
         public void onClick(final View v) {
-            Button key = (Button) v;
-            switch(key.getText().toString()) {
+            Button clickedKey = (Button) v;
+            switch(clickedKey.getText().toString()) {
                 case "#+=":
                     changeToSymbols();
+                    changehighlightedBtn(clickedKey);
                     break;
                 case "abc":
                     changeToLetters();
+                    changehighlightedBtn(clickedKey);
                     break;
                 case "βΔഽ":
                     changeToGreek();
+                    changehighlightedBtn(clickedKey);
+                    break;
+                case "fnc":
+                    changeToFunction();
+                    changehighlightedBtn(clickedKey);
+                    break;
+                case "lim":
+                    eqManager.insert(typingZone.getSelectionStart(), "lim[⟶]");
+                    typingZone.getText().insert(typingZone.getSelectionStart(), "lim[⟶]");
+                    typingZone.setSelection(typingZone.getSelectionStart() - 2);
+                    break;
+                case "sin":
+                case "cos":
+                case "tan":
+                case "ln":
+                case "log":
+                    eqManager.insert(typingZone.getSelectionStart(), clickedKey.getText().toString() + "()");
+                    typingZone.getText().insert(typingZone.getSelectionStart(), clickedKey.getText().toString() + "()");
+                    typingZone.setSelection(typingZone.getSelectionStart() - 1);
+                    break;
+                case "sin-1":
+                case "cos-1":
+                case "tan-1":
+                    eqManager.insert(typingZone.getSelectionStart(), clickedKey.getText().toString() + "()");
+                    SpannableStringBuilder exponentBuilder = new SpannableStringBuilder(clickedKey.getText().toString() + "()");
+                    exponentBuilder.setSpan(new SuperscriptSpan(), 3, 5, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    exponentBuilder.setSpan(new RelativeSizeSpan(0.75f), 3, 5, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    typingZone.getText().insert(typingZone.getSelectionStart(), exponentBuilder);
+                    typingZone.setSelection(typingZone.getSelectionStart() - 1);
+                    break;
+                case "xy":
+                    if(exponentMode){
+                        clickedKey.getBackground().setColorFilter(new LightingColorFilter(0xFFFFFFFF, 0xFFAA0000));
+                        exponentMode = false;
+                    }else{
+                        clickedKey.getBackground().setColorFilter(new LightingColorFilter(0xAAAABB00, 0xFFAA0000));
+                        exponentMode = true;
+                    }
                     break;
                 default:
-                    typingZone.getText().insert(typingZone.getSelectionStart(), key.getText().toString());
+                    if(!exponentMode){
+                        eqManager.insert(typingZone.getSelectionStart(), clickedKey.getText().toString());
+                        typingZone.getText().insert(typingZone.getSelectionStart(), clickedKey.getText().toString());
+                    }
+                    else{
+                        eqManager.addExponent(typingZone.getSelectionStart(), clickedKey.getText().toString());
+                        SpannableStringBuilder exponent = new SpannableStringBuilder(clickedKey.getText().toString());
+                        exponent.setSpan(new SuperscriptSpan(), 0, clickedKey.length(), Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+                        exponent.setSpan(new RelativeSizeSpan(0.75f), 0, clickedKey.length(), Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+                        typingZone.getText().insert(typingZone.getSelectionStart(), exponent);
+                    }
                     break;
             }
         }
     };
 
     /**
-     * Listener called when the backspace is toutched
+     * Listener called when the backspace is touched
      */
    final OnTouchListener backspaceTouchListener = new OnTouchListener() {
        @Override
        public boolean onTouch(View v, MotionEvent event) {
+           if(event.getAction() == MotionEvent.ACTION_DOWN){
+               String typingText = String.valueOf(typingZone.getText().subSequence(0 ,typingZone.getSelectionStart()));
+               if(typingText.length() >= 5){
+                   typingText = typingText.substring(typingText.length() - 5, typingText.length());
+                   if(typingText.equals("sin-1")|| typingText.equals("cos-1") || typingText.equals("tan-1"))
+                       for(int i = 0; i<4; i++){
+                           eqManager.deleteChar(typingZone.getSelectionStart());
+                           typingZone.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
+                       }
+                   }
 
-           if(event.getAction() == MotionEvent.ACTION_DOWN)
-                backspaceHandler.postDelayed(run, 0);
+               if(typingText.length() >= 3){
+                   typingText = typingText.substring(typingText.length() - 3, typingText.length());
+                   if (typingText.equals("sin")|| typingText.equals("cos") || typingText.equals("tan")|| typingText.equals("lim")|| typingText.equals("log"))
+                       for(int i = 0; i<2; i++){
+                           eqManager.deleteChar(typingZone.getSelectionStart());
+                           typingZone.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
+                       }
+               }
 
-               if(event.getAction() == MotionEvent.ACTION_UP)
-                   backspaceHandler.removeCallbacks(run);
+               if(typingText.length() >= 2){
+                   typingText = typingText.substring(typingText.length() - 2, typingText.length());
+                   if(typingText.equals("ln")){
+                       eqManager.deleteChar(typingZone.getSelectionStart());
+                       typingZone.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
+                   }
+               }
+               backspaceHandler.postDelayed(run, 0);
+           }
+
+
+           if(event.getAction() == MotionEvent.ACTION_UP)
+               backspaceHandler.removeCallbacks(run);
 
            return true;
        }
    };
 
 
-    /**
-     * Listener called when the backspace is clicked
-     */
-    final OnClickListener backspaceListener = new OnClickListener() {
+    final OnClickListener confirmClickListener = new OnClickListener() {
         public void onClick(final View v) {
-            typingZone.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
+            typingZone.setText(eqManager.getEquation());
         }
-
     };
-
 
     /**
      * change the current keyboard key to the symbols
      */
     private void changeToSymbols(){
-        if(limBtn.getText().toString() == "lim"){
-            removeViewAt(26);
-            addView(key[26], 26);
-            addView(key[27], 27);
-            limBtn.setText("");
+        if(key[32].getText().toString() == "sin"){
+            for(int i = 0; i < 9; i++){
+                removeViewAt(2*i);
+                addView(key[2*i], 2*i);
+                addView(key[2*i + 1], 2*i+ 1);
+                key[32 + i].setText("");
+            }
         }
 
-        for(int i = 0; i < 10; i++)
-            key[i].setText(keyText[i]);
+        for(int i = 0; i < 28; i++)
+            key[i].setText(keyText[i + 28]);
 
-        for (int i = 10; i < 28; i++)
-            key[i].setText(keyText[i +18]);
+        SpannableStringBuilder exponentBuilder = new SpannableStringBuilder("xy");
+
+        exponentBuilder.setSpan(new SuperscriptSpan(), 1, 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        exponentBuilder.setSpan(new RelativeSizeSpan(0.75f), 1, 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        key[27].setText(exponentBuilder);
+
+        if(exponentMode)
+            key[27].getBackground().setColorFilter(new LightingColorFilter(0xAAAABB00, 0xFFAA0000));
     }
 
     /**
@@ -280,15 +390,19 @@ public class mathematicalKeyboard extends GridLayout{
      */
     private void changeToLetters(){
 
-        if(limBtn.getText().toString() == "lim"){
-            removeViewAt(26);
-            addView(key[26], 26);
-            addView(key[27], 27);
-            limBtn.setText("");
+        if(key[32].getText().toString() == "sin"){
+            for(int i = 0; i < 9; i++){
+                removeViewAt(2*i);
+                addView(key[2*i], 2*i);
+                addView(key[2*i + 1], 2*i+ 1);
+                key[32 + i].setText("");
+            }
         }
 
         for (int i = 0; i < 28; i++)
             key[i].setText(keyText[i]);
+
+        key[27].getBackground().setColorFilter(new LightingColorFilter(0xFFFFFFFF, 0xFFAA0000));
     }
 
     /**
@@ -296,26 +410,73 @@ public class mathematicalKeyboard extends GridLayout{
      */
     private void changeToGreek(){
 
-        if(limBtn.getText().toString() == ""){
-            removeViewAt(26);
-            removeViewAt(26);
-
-            addView(limBtn, 26);
-
-            //lim Button
-            GridLayout.LayoutParams LimLP = (GridLayout.LayoutParams)limBtn.getLayoutParams();
-            LimLP.columnSpec = GridLayout.spec(6, 2);
-            limBtn.setLayoutParams(LimLP);
-
-            ViewGroup.LayoutParams params = limBtn.getLayoutParams();
-            params.width = screenWidth /5;
-            limBtn.setLayoutParams(params);
-
-            limBtn.setText("lim");
+        if(key[32].getText().toString() == "sin"){
+            for(int i = 0; i < 9; i++){
+                removeViewAt(2*i);
+                addView(key[2*i], 2*i);
+                addView(key[2*i + 1], 2*i+ 1);
+                key[32 + i].setText("");
+            }
         }
 
-        for (int i = 0; i < 28; i++)
-           key[i].setText(keyText[i +46]);
+        for (int i = 0; i < 10; i++)
+            key[i].setText(keyText[i + 28]);
+
+        for (int i = 10; i < 28; i++)
+           key[i].setText(keyText[i + 46]);
+
+        key[27].getBackground().setColorFilter(new LightingColorFilter(0xFFFFFFFF, 0xFFAA0000));
+
+    }
+
+
+    private void changeToFunction() {
+        if(key[32].getText().toString().equals("")){
+            for (int i = 0; i < 9; i++){
+                removeViewAt(i);
+                removeViewAt(i);
+                addView(key[i + 32], i);
+
+                //lim Button
+                GridLayout.LayoutParams LimLP = (GridLayout.LayoutParams)key[32 + i].getLayoutParams();
+                LimLP.columnSpec = GridLayout.spec((2*i)%10, 2);
+                key[32 + i].setLayoutParams(LimLP);
+
+                ViewGroup.LayoutParams params = key[32 + i].getLayoutParams();
+                params.width = screenWidth /5;
+                key[32 + i].setLayoutParams(params);
+
+                key[32 + i].setText(keyText[i + 74]);
+            }
+
+            //setting the -1 in exponent
+            for(int i = 0; i < 3; i++){
+                SpannableStringBuilder exponentBuilder = new SpannableStringBuilder(keyText[77 + i] + "-1");
+
+                exponentBuilder.setSpan(new SuperscriptSpan(), 3, 5, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                exponentBuilder.setSpan(new RelativeSizeSpan(0.75f), 3, 5, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+                key[35 + i].setText(exponentBuilder);
+            }
+
+            for (int i = 0; i < 28; i++)
+                key[i].setText("");
+
+            key[27].getBackground().setColorFilter(new LightingColorFilter(0xFFFFFFFF, 0xFFAA0000));
+        }
+    }
+
+    /**
+     * Change the highlighted button
+     * @param btn the button tha we want to be highlighted
+     */
+    private void changehighlightedBtn(Button btn){
+
+        for(int i = 0; i < 4; i++)
+            key[i + 28].getBackground().setColorFilter(new LightingColorFilter(0xFFFFFFFF, 0xFFAA0000));
+
+        btn.getBackground().setColorFilter(new LightingColorFilter(0xAAAABB00, 0xFFAA0000));
+
     }
 
     /**
@@ -324,9 +485,9 @@ public class mathematicalKeyboard extends GridLayout{
     private Runnable run = new Runnable() {
         @Override
         public void run() {
+            eqManager.deleteChar(typingZone.getSelectionStart());
             typingZone.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
-            backspaceHandler.postDelayed(run, 250);
+            backspaceHandler.postDelayed(run, 200);
         }
     };
-
 }
