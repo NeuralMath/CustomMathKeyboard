@@ -44,12 +44,20 @@ public class customEditText extends android.support.v7.widget.AppCompatEditText 
     }
 
     /**
-     * This override function to disable the text drag and drop
+     * This override function disable the text drag and drop
      * @param event
      * @return
      */
     @Override
     public boolean onDragEvent(DragEvent event) {
         return  true;
+    }
+
+    /**
+     * This override function disable the spellcheck
+     */
+    @Override
+    public boolean isSuggestionsEnabled() {
+        return true;
     }
 }

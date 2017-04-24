@@ -31,6 +31,7 @@ public class MainActivity extends AppCompatActivity {
 
         mainLayout = (RelativeLayout) findViewById(R.id.mainLayout);
         writingZone = (customEditText) findViewById(R.id.writingZone);
+        writingZone.setText("x^(232)+76");
 
 
         /* ------------------------------------------------
@@ -58,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
         writingZone.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mathKeyboard.openKeyboard(writingZone, screenDimensions);
+                mathKeyboard.openKeyboard(writingZone, screenDimensions, true);
             }
         });
         }

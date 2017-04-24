@@ -27,14 +27,20 @@ public class mathematicalKeyboard extends GridLayout{
     private Button[] key;
     private Button confirmBtn;
 
-    EquationManager eqManager;
+    private  CorrectionManager correctionManager;
+
+    private boolean correctionMode; //the correction mode will keep in memory the modification of the equation and will
+                                    // tell the neural network the correction to improve the accuracy of the neural network
+    private boolean keyboardIsOpen;
+
 
     private ImageButton backspaceBtn;
     private EditText typingZone;
     private int screenWidth;
     private Handler backspaceHandler;
 
-    private boolean exponentMode; //if true everything will be written in exponent
+    SpannableStringBuilder exponentBuilder;
+
 
     private String[] keyText = {
 
@@ -167,12 +173,9 @@ public class mathematicalKeyboard extends GridLayout{
         addView(confirmBtn);
 
 
-        exponentMode = false;
-
-
         backspaceHandler = new Handler(); //initialization of the Handler
 
-
+        keyboardIsOpen = false;
     }
 
     /**
@@ -180,21 +183,26 @@ public class mathematicalKeyboard extends GridLayout{
      * @param writingZone The textView where we want to  write
      * @param screenDimensions The screen dimensions
      */
-    public void openKeyboard(EditText writingZone, DisplayMetrics screenDimensions){
-        screenWidth = screenDimensions.widthPixels;
-        setKeyWidith();
-        setVisibility(VISIBLE);
-        typingZone = writingZone;
+    public void openKeyboard(EditText writingZone, DisplayMetrics screenDimensions, boolean correction){
+        if(!keyboardIsOpen){
+            screenWidth = screenDimensions.widthPixels;
+            setKeyWidth();
+            setVisibility(VISIBLE);
+            typingZone = writingZone;
+            keyboardIsOpen = true;
 
-        //creation of the EquationManager
-        eqManager = new EquationManager(typingZone.getText().toString());
+            correctionMode = correction;
+            if(correction)
+                correctionManager = new CorrectionManager(typingZone.getText().toString());
+        }
     }
+
 
 
     /**
      * Setting the button layout param and the width
      */
-    private void setKeyWidith(){
+    private void setKeyWidth(){
         int keyWidth = screenWidth / 10;
 
 
@@ -243,67 +251,94 @@ public class mathematicalKeyboard extends GridLayout{
             switch(clickedKey.getText().toString()) {
                 case "#+=":
                     changeToSymbols();
-                    changehighlightedBtn(clickedKey);
+                    changeHighlightedBtn(clickedKey);
                     break;
                 case "abc":
                     changeToLetters();
-                    changehighlightedBtn(clickedKey);
+                    changeHighlightedBtn(clickedKey);
                     break;
                 case "βΔഽ":
                     changeToGreek();
-                    changehighlightedBtn(clickedKey);
+                    changeHighlightedBtn(clickedKey);
                     break;
                 case "fnc":
                     changeToFunction();
-                    changehighlightedBtn(clickedKey);
+                    changeHighlightedBtn(clickedKey);
                     break;
                 case "lim":
-                    eqManager.insert(typingZone.getSelectionStart(), "lim[⟶]");
-                    typingZone.getText().insert(typingZone.getSelectionStart(), "lim[⟶]");
-                    typingZone.setSelection(typingZone.getSelectionStart() - 2);
+                    if(!correctionMode) {
+                        typingZone.getText().insert(typingZone.getSelectionStart(), "lim[⟶]");
+                        typingZone.setSelection(typingZone.getSelectionStart() - 2);
+                    }else if(correctionManager.getCorrectionCounter() >= 3 && correctionManager.hasDeletedCharAt(typingZone.getSelectionStart(), clickedKey.getText().length())){
+                        for(int i = 0; i < clickedKey.getText().length(); i++)
+                            correctionManager.addChar(clickedKey.getText().charAt(i), typingZone.getSelectionStart() + i);
+
+                        typingZone.getText().insert(typingZone.getSelectionStart(), "lim");
+                    }
                     break;
                 case "sin":
                 case "cos":
                 case "tan":
                 case "ln":
                 case "log":
-                    eqManager.insert(typingZone.getSelectionStart(), clickedKey.getText().toString() + "()");
-                    typingZone.getText().insert(typingZone.getSelectionStart(), clickedKey.getText().toString() + "()");
-                    typingZone.setSelection(typingZone.getSelectionStart() - 1);
+                case "ഽ":
+                    if(!correctionMode){
+                        typingZone.getText().insert(typingZone.getSelectionStart(), clickedKey.getText().toString() + "()");
+                        typingZone.setSelection(typingZone.getSelectionStart() - 1);
+                    }else if(correctionManager.getCorrectionCounter() >= clickedKey.getText().length() && correctionManager.hasDeletedCharAt(typingZone.getSelectionStart(), clickedKey.getText().length())){
+                        for(int i = 0; i < clickedKey.getText().length(); i++)
+                            correctionManager.addChar(clickedKey.getText().charAt(i), typingZone.getSelectionStart() + i);
+
+                        typingZone.getText().insert(typingZone.getSelectionStart(), clickedKey.getText().toString());
+                    }
                     break;
                 case "sin-1":
                 case "cos-1":
                 case "tan-1":
-                    eqManager.insert(typingZone.getSelectionStart(), clickedKey.getText().toString() + "()");
-                    SpannableStringBuilder exponentBuilder = new SpannableStringBuilder(clickedKey.getText().toString() + "()");
-                    exponentBuilder.setSpan(new SuperscriptSpan(), 3, 5, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    exponentBuilder.setSpan(new RelativeSizeSpan(0.75f), 3, 5, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    typingZone.getText().insert(typingZone.getSelectionStart(), exponentBuilder);
-                    typingZone.setSelection(typingZone.getSelectionStart() - 1);
+                    if(!correctionMode) {
+                        exponentBuilder = new SpannableStringBuilder(clickedKey.getText().toString() + "()");
+                        exponentBuilder.setSpan(new SuperscriptSpan(), 3, 5, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        exponentBuilder.setSpan(new RelativeSizeSpan(0.75f), 3, 5, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        typingZone.getText().insert(typingZone.getSelectionStart(), exponentBuilder);
+                        typingZone.setSelection(typingZone.getSelectionStart() - 1);
+                    }else if(correctionManager.getCorrectionCounter() >= clickedKey.getText().length() && correctionManager.hasDeletedCharAt(typingZone.getSelectionStart(), 5)){
+                        for(int i = 0; i < clickedKey.getText().length(); i++)
+                            correctionManager.addChar(clickedKey.getText().charAt(i), typingZone.getSelectionStart() + i);
+
+                        exponentBuilder = new SpannableStringBuilder(clickedKey.getText().toString());
+                        exponentBuilder.setSpan(new SuperscriptSpan(), 3, 5, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        exponentBuilder.setSpan(new RelativeSizeSpan(0.75f), 3, 5, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        typingZone.getText().insert(typingZone.getSelectionStart(), exponentBuilder);
+                        typingZone.setSelection(typingZone.getSelectionStart() - 1);
+                    }
                     break;
                 case "xy":
-                    if(exponentMode){
-                        clickedKey.getBackground().setColorFilter(new LightingColorFilter(0xFFFFFFFF, 0xFFAA0000));
-                        exponentMode = false;
-                    }else{
-                        clickedKey.getBackground().setColorFilter(new LightingColorFilter(0xAAAABB00, 0xFFAA0000));
-                        exponentMode = true;
+                    if(!correctionMode){
+                        exponentBuilder = new SpannableStringBuilder("^()");
+                        exponentBuilder.setSpan(new SuperscriptSpan(), 0, 3, Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+                        exponentBuilder.setSpan(new RelativeSizeSpan(0.75f), 0, 3, Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+                        typingZone.getText().insert(typingZone.getSelectionStart(), exponentBuilder);
+                        typingZone.setSelection(typingZone.getSelectionStart() - 1);
+                    }else if(correctionManager.getCorrectionCounter() > 0 && correctionManager.hasDeletedCharAt(typingZone.getSelectionStart())){
+                        correctionManager.addChar('^', typingZone.getSelectionStart());
+                        exponentBuilder = new SpannableStringBuilder("^");
+                        exponentBuilder.setSpan(new SuperscriptSpan(), 0, 1, Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+                        exponentBuilder.setSpan(new RelativeSizeSpan(0.75f), 0, 1, Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+                        typingZone.getText().insert(typingZone.getSelectionStart(), exponentBuilder);
                     }
+
+
                     break;
                 default:
-                    if(!exponentMode){
-                        eqManager.insert(typingZone.getSelectionStart(), clickedKey.getText().toString());
+                    if(!correctionMode)
                         typingZone.getText().insert(typingZone.getSelectionStart(), clickedKey.getText().toString());
-                    }
-                    else{
-                        eqManager.addExponent(typingZone.getSelectionStart(), clickedKey.getText().toString());
-                        SpannableStringBuilder exponent = new SpannableStringBuilder(clickedKey.getText().toString());
-                        exponent.setSpan(new SuperscriptSpan(), 0, clickedKey.length(), Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
-                        exponent.setSpan(new RelativeSizeSpan(0.75f), 0, clickedKey.length(), Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
-                        typingZone.getText().insert(typingZone.getSelectionStart(), exponent);
+                    else if(correctionManager.getCorrectionCounter() > 0 && correctionManager.hasDeletedCharAt(typingZone.getSelectionStart())){
+                        correctionManager.addChar(clickedKey.getText().toString().charAt(0), typingZone.getSelectionStart());
+                        typingZone.getText().insert(typingZone.getSelectionStart(), clickedKey.getText().toString());
                     }
                     break;
             }
+
         }
     };
 
@@ -319,7 +354,7 @@ public class mathematicalKeyboard extends GridLayout{
                    typingText = typingText.substring(typingText.length() - 5, typingText.length());
                    if(typingText.equals("sin-1")|| typingText.equals("cos-1") || typingText.equals("tan-1"))
                        for(int i = 0; i<4; i++){
-                           eqManager.deleteChar(typingZone.getSelectionStart());
+                           correctionManager.deleteChar(typingZone.getText().toString().charAt(typingZone.getSelectionStart() - 1), typingZone.getSelectionStart() - 1);
                            typingZone.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
                        }
                    }
@@ -328,7 +363,7 @@ public class mathematicalKeyboard extends GridLayout{
                    typingText = typingText.substring(typingText.length() - 3, typingText.length());
                    if (typingText.equals("sin")|| typingText.equals("cos") || typingText.equals("tan")|| typingText.equals("lim")|| typingText.equals("log"))
                        for(int i = 0; i<2; i++){
-                           eqManager.deleteChar(typingZone.getSelectionStart());
+                           correctionManager.deleteChar(typingZone.getText().toString().charAt(typingZone.getSelectionStart()- 1), typingZone.getSelectionStart() - 1);
                            typingZone.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
                        }
                }
@@ -336,7 +371,7 @@ public class mathematicalKeyboard extends GridLayout{
                if(typingText.length() >= 2){
                    typingText = typingText.substring(typingText.length() - 2, typingText.length());
                    if(typingText.equals("ln")){
-                       eqManager.deleteChar(typingZone.getSelectionStart());
+                       correctionManager.deleteChar(typingZone.getText().toString().charAt(typingZone.getSelectionStart() - 1), typingZone.getSelectionStart() - 1);
                        typingZone.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
                    }
                }
@@ -351,10 +386,18 @@ public class mathematicalKeyboard extends GridLayout{
        }
    };
 
-
+    /**
+     * Listener called when the ok button is clicked
+     */
     final OnClickListener confirmClickListener = new OnClickListener() {
         public void onClick(final View v) {
-            typingZone.setText(eqManager.getEquation());
+            String temp = typingZone.getText().toString();
+
+            temp = temp.replace("sin-1", "arcsin");
+            temp = temp.replace("cos-1", "arccos");
+            temp = temp.replace("tan-1", "arctan");
+
+            typingZone.setText(temp);
         }
     };
 
@@ -380,9 +423,6 @@ public class mathematicalKeyboard extends GridLayout{
         exponentBuilder.setSpan(new RelativeSizeSpan(0.75f), 1, 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 
         key[27].setText(exponentBuilder);
-
-        if(exponentMode)
-            key[27].getBackground().setColorFilter(new LightingColorFilter(0xAAAABB00, 0xFFAA0000));
     }
 
     /**
@@ -470,8 +510,7 @@ public class mathematicalKeyboard extends GridLayout{
      * Change the highlighted button
      * @param btn the button tha we want to be highlighted
      */
-    private void changehighlightedBtn(Button btn){
-
+    private void changeHighlightedBtn(Button btn){
         for(int i = 0; i < 4; i++)
             key[i + 28].getBackground().setColorFilter(new LightingColorFilter(0xFFFFFFFF, 0xFFAA0000));
 
@@ -485,9 +524,9 @@ public class mathematicalKeyboard extends GridLayout{
     private Runnable run = new Runnable() {
         @Override
         public void run() {
-            eqManager.deleteChar(typingZone.getSelectionStart());
+            correctionManager.deleteChar(typingZone.getText().toString().charAt(typingZone.getSelectionStart() - 1), typingZone.getSelectionStart() - 1);
             typingZone.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
-            backspaceHandler.postDelayed(run, 200);
+            backspaceHandler.postDelayed(run, 100);
         }
     };
 }
